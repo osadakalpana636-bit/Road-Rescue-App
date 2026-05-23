@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RoadRescue SL Prototype</title>
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    :root {
+      --color-bg-primary: #ffffff;
+      --color-bg-secondary: #f8f9fa;
+      --color-text-primary: #1a1a2e;
+      --color-text-secondary: #6c757d;
+      --color-border: #e9ecef;
+      --color-danger: #e24b4a;
+      --color-success: #28a745;
+      --border-radius-lg: 16px;
+      --border-radius-md: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    
+    /* Phone Shell Wrapper for Presentation Layout */
+    .phone-wrap { display: flex; justify-content: center; padding: 20px 0; }
+    .phone { width: 360px; height: 740px; background: var(--color-bg-primary); border-radius: 36px; border: 8px solid #1a1a2e; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.2); position: relative; }
+    
+    /* Top Native Status Bar */
+    .status-bar { background: #1a1a2e; display: flex; justify-content: space-between; align-items: center; padding: 12px 24px 6px; font-size: 12px; color: #aaa; z-index: 1000; }
+    
+    /* Main Screen View Controllers */
+    .screen { display: none; flex: 1; flex-direction: column; overflow: hidden; height: calc(100% - 32px); }
+    .screen.active { display: flex; }
+    
+    /* Map Component View Container */
+    .map-container { height: 260px; position: relative; width: 100%; background: #e5e3df; }
+    #live-map { height: 100%; width: 100%; }
+    
+    /* Interactive Map Overlay Controls */
+    .map-overlay { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; z-index: 999; pointer-events: none; }
+    .map-badge, .sos-btn { pointer-events: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .map-badge { background: rgba(26, 26, 46, 0.9); color: #fff; font-size: 12px; padding: 8px 14px; border-radius: 20px; display: flex; align-items: center; gap: 4px; }
+    .sos-btn { background: var(--color-danger); color: #fff; border: none; border-radius: 20px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: transform 0.1s; }
+    .sos-btn:active { transform: scale(0.95); }
+    
+    /* Content Scrolling View */
+    .content-scroll { flex: 1; overflow-y: auto; background: var(--color-bg-secondary); padding-bottom: 20px; }
+    .section-header { padding: 16px 16px 8px; font-size: 14px; font-weight: 600; color: var(--color-text-primary); text-transform: uppercase; letter-spacing: 0.5px; }
+    
+    /* Custom Garage Cards Styling */
+    .garage-card { margin: 0 12px 12px; background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: var(--border-radius-lg); padding: 14px; cursor: pointer; transition: all 0.2s ease; }
+    .garage-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .garage-card.featured { border: 2px solid var(--color-success); }
+    .garage-top { display: flex; align-items: flex-start; justify-content: space-between; }
+    .garage-avatar { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-right: 12px; flex-shrink: 0; }
+    .garage-info { flex: 1; }
+    .garage-name { font-size: 15px; font-weight: 600; color: var(--color-text-primary); }
+    .garage-type { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
+    
+    /* Dynamic Badges UI */
+    .garage-meta { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .badge { font-size: 11px; padding: 4px 8px; border-radius: 12px; font-weight: 600; }
+    .badge-open { background: #eaf3de; color: #3b6d11; }
+    .badge-busy { background: #faeeda; color: #854f0b; }
+    .badge-closed { background: #fcebeb; color: #a32d2d; }
+    .badge-dist { background: var(--color-bg-secondary); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+    .stars { color: #EF9F27; font-size: 12px; letter-spacing: -1px; }
+    
+    /* Grid Actions Row Layout */
+    .garage-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .btn-call { flex: 1; background: var(--color-success); color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-dir { flex: 1; background: var(--color-bg-secondary); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: 8px; padding: 10px; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-info { width: 38px; background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--color-text-primary); }
+    
+    /* Native Tab Bottom Nav Bar Layout */
+    .nav-bar { display: flex; background: var(--color-bg-primary); border-top: 1px solid var(--color-border); padding: 8px 0 10px; z-index: 1000; }
+    .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+    .nav-item i { font-size: 22px; color: #b7bcce; }
+    .nav-item.active i, .nav-item.active span { color: var(--color-success); }
+    .nav-item span { font-size: 10px; color: #b7bcce; font-weight: 500; }
+    
+    /* Detail View Header Styles */
+    .detail-header { background: #1a1a2e; padding: 16px; display: flex; align-items: center; gap: 12px; color: #fff; }
+    .back-btn { color: #fff; background: none; border: none; cursor: pointer; display: flex; align-items: center; font-size: 16px; }
+    .detail-title { font-size: 16px; font-weight: 600; }
+    .detail-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+    .detail-name { font-size: 20px; font-weight: 700; color: var(--color-text-primary); }
+    .detail-sub { font-size: 13px; color: var(--color-text-secondary); margin-top: -10px; display: flex; align-items: center; gap: 4px; }
+    
+    /* Statistical Summary Row Layout Grid */
+    .detail-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .stat-box { background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--border-radius-lg); padding: 12px 6px; text-align: center; }
+    .stat-val { font-size: 15px; font-weight: 700; color: var(--color-text-primary); }
+    .stat-lbl { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+    
+    /* Action Grid Panels */
+    .services-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .service-tag { background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: var(--border-radius-md); padding: 10px; font-size: 12px; color: var(--color-text-primary); display: flex; align-items: center; gap: 8px; }
+    .service-tag i { font-size: 16px; color: var(--color-success); }
+    .call-big { width: 100%; background: var(--color-success); color: #fff; border: none; border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(40,167,69,0.2); }
+    
+    /* SOS Screen view */
+    .sos-screen { background: var(--color-danger); color: #fff; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+    .sos-pulse { width: 110px; height: 110px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; animation: pulse-radar 1.6s infinite ease-in-out; }
+    .sos-pulse i { font-size: 54px; color: #fff; }
+    @keyframes pulse-radar { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255,255,255,0.4); } 70% { transform: scale(1.1); box-shadow: 0 0 0 24px rgba(255,255,255,0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255,255,255,0); } }
+    .sos-title { font-size: 26px; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.5px; }
+    .sos-sub { font-size: 14px; color: rgba(255,255,255,0.85); margin-bottom: 28px; line-height: 1.4; }
+    .sos-info-card { background: rgba(255,255,255,0.15); border-radius: var(--border-radius-lg); padding: 16px; margin-bottom: 32px; width: 100%; border: 1px solid rgba(255,255,255,0.2); }
+    .sos-cancel { background: rgba(255,255,255,0.2); color: #fff; border: 1.5px solid rgba(255,255,255,0.4); border-radius: 12px; padding: 14px 40px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .sos-cancel:hover { background: rgba(255,255,255,0.3); }
+    
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+  </style>
+</head>
+<body>
+
+<h2 class="sr-only">RoadRescue SL App Prototype</h2>
+
+<div class="phone-wrap">
+  <div class="phone">
+    
+    <div class="status-bar">
+      <span>9:41</span>
+      <span style="display:flex; gap:6px; align-items:center;">
+        <i class="ti ti-wifi"></i>
+        <i class="ti ti-battery-4"></i>
+      </span>
+    </div>
+
+    <div class="screen active" id="screen-home">
+      <div class="map-container">
+        <div id="live-map"></div>
+        
+        <div class="map-overlay">
+          <div class="map-badge">
+            <i class="ti ti-map-pin"></i> 
+            <span id="current-location-txt">Colombo Highway, SL</span>
+          </div>
+          <button class="sos-btn" onclick="showSOS()">
+            <i class="ti ti-alert-triangle"></i> SOS
+          </button>
+        </div>
+      </div>
+
+      <div class="content-scroll">
+        <div class="section-header">Nearest Emergency Garages</div>
+
+        <div class="garage-card featured" onclick="showDetail('AutoFix')">
+          <div class="garage-top">
+            <div class="garage-avatar" style="background:#eaf3de">🔧</div>
+            <div class="garage-info">
+              <div class="garage-name">AutoFix Colombo</div>
+              <div class="garage-type">General repair · Tyre & battery</div>
+              <div class="garage-meta">
+                <span class="badge badge-open">Open now</span>
+                <span class="badge badge-dist"><i class="ti ti-map-pin"></i> 0.4 km</span>
+                <span class="stars">★★★★★</span>
+              </div>
+            </div>
+          </div>
+          <div class="garage-actions">
+            <button class="btn-call" onclick="event.stopPropagation(); alert('Calling AutoFix Colombo at +94 11 234 5678...')"><i class="ti ti-phone"></i> Call</button>
+            <button class="btn-dir" onclick="event.stopPropagation(); focusOnMap(6.8962, 79.8571)"><i class="ti ti-navigation"></i> Track</button>
+            <button class="btn-info"><i class="ti ti-chevron-right"></i></button>
+          </div>
+        </div>
+
+        <div class="garage-card" onclick="showDetail('Saman')">
+          <div class="garage-top">
+            <div class="garage-avatar" style="background:#e6f1fb">🚗</div>
+            <div class="garage-info">
+              <div class="garage-name">Saman Motors</div>
+              <div class="garage-type">Engine · Electrical · AC repair</div>
+              <div class="garage-meta">
+                <span class="badge badge-busy">Busy</span>
+                <span class="badge badge-dist"><i class="ti ti-map-pin"></i> 1.1 km</span>
+                <span class="stars">★★★★☆</span>
+              </div>
+            </div>
+          </div>
+          <div class="garage-actions">
+            <button class="btn-call" onclick="event.stopPropagation(); alert('Calling Saman Motors...')"><i class="ti ti-phone"></i> Call</button>
+            <button class="btn-dir" onclick="event.stopPropagation(); focusOnMap(6.8995, 79.8630)"><i class="ti ti-navigation"></i> Track</button>
+            <button class="btn-info"><i class="ti ti-chevron-right"></i></button>
+          </div>
+        </div>
+
+        <div class="garage-card" onclick="showDetail('Perera')">
+          <div class="garage-top">
+            <div class="garage-avatar" style="background:#faeeda">⚙️</div>
+            <div class="garage-info">
+              <div class="garage-name">Perera Auto Works</div>
+              <div class="garage-type">Tyres · Brakes · Oil change</div>
+              <div class="garage-meta">
+                <span class="badge badge-closed">Closed</span>
+                <span class="badge badge-dist"><i class="ti ti-map-pin"></i> 2.3 km</span>
+                <span class="stars">★★★★☆</span>
+              </div>
+            </div>
+          </div>
+          <div class="garage-actions">
+            <button class="btn-call" onclick="event.stopPropagation(); alert('Garage is closed. Dialing out-of-hours hotline...')"><i class="ti ti-phone"></i> Call</button>
+            <button class="btn-dir" onclick="event.stopPropagation(); focusOnMap(6.8880, 79.8695)"><i class="ti ti-navigation"></i> Track</button>
+            <button class="btn-info"><i class="ti ti-chevron-right"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-bar">
+        <div class="nav-item active"><i class="ti ti-map-2"></i><span>Nearby</span></div>
+        <div class="nav-item" onclick="alert('All Garages list feature simulated for prototype.')"><i class="ti ti-list"></i><span>All Garages</span></div>
+        <div class="nav-item" onclick="alert('No past breakdown history.')"><i class="ti ti-history"></i><span>History</span></div>
+        <div class="nav-item" onclick="alert('User profile settings view.')"><i class="ti ti-user"></i><span>Profile</span></div>
+      </div>
+    </div>
+
+    <div class="screen" id="screen-detail">
+      <div class="detail-header">
+        <button class="back-btn" onclick="showHome()"><i class="ti ti-arrow-left"></i> Back</button>
+        <span class="detail-title">Garage Profile</span>
+      </div>
+      
+      <div class="content-scroll" style="background: #fff;">
+        <div class="detail-body">
+          <div class="detail-name" id="detail-name">AutoFix Colombo</div>
+          <div class="detail-sub"><i class="ti ti-map-pin" style="color: var(--color-danger)"></i> <span id="detail-addr">No. 12, Galle Road, Colombo 05</span></div>
+          
+          <div class="detail-stats">
+            <div class="stat-box"><div class="stat-val" id="d-dist">0.4 km</div><div class="stat-lbl">Distance</div></div>
+            <div class="stat-box"><div class="stat-val" id="d-eta">~6 min</div><div class="stat-lbl">ETA</div></div>
+            <div class="stat-box"><div class="stat-val" id="d-rating">4.9 ★</div><div class="stat-lbl">Rating</div></div>
+          </div>
+          
+          <div style="font-size:14px; font-weight:600; color:var(--color-text-primary); margin-top:10px;">Available Services</div>
+          <div class="services-grid" id="d-services">
+            </div>
+          
+          <button class="call-big" onclick="alert('Connecting phone line to mechanic vendor terminal...')">
+            <i class="ti ti-phone-call"></i> Call Mechanics Unit
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen" id="screen-sos">
+      <div class="sos-screen">
+        <div class="sos-pulse"><i class="ti ti-alert-triangle"></i></div>
+        <div class="sos-title">SOS Broadcast Active</div>
+        <div class="sos-sub">Your exact GPS coordinates have been broadcasted to all mobile breakdown vans within a 5km radius.</div>
+        
+        <div class="sos-info-card">
+          <div style="font-size:11px; text-transform:uppercase; color:rgba(255,255,255,0.7); margin-bottom:4px; font-weight:600;">Broadcast Source Location</div>
+          <div style="font-size:15px; font-weight:600;" id="sos-live-loc">Retrieving GPS...</div>
+          <div style="font-size:12px; color:rgba(255,255,255,0.7); margin-top:8px; border-top:1px solid rgba(255,255,255,0.2); padding-top:8px;">
+            Status: <span style="color:#6aff8f; font-weight:600;">Waiting for Response</span>
+          </div>
+        </div>
+        
+        <button class="sos-cancel" onclick="showHome()">Cancel Emergency</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// Mock Core Data Structures 
+const garages = {
+  AutoFix: { name: 'AutoFix Colombo', addr: 'No. 12, Galle Road, Colombo 05', dist: '0.4 km', eta: '~6 min', rating: '4.9 ★', coords: [6.8962, 79.8571], services: ['Tyre change','Battery replace','Engine check','Towing'] },
+  Saman: { name: 'Saman Motors', addr: 'No. 45, Duplication Road, Colombo 03', dist: '1.1 km', eta: '~14 min', rating: '4.2 ★', coords: [6.8995, 79.8630], services: ['Engine repair','Electrical','AC repair'] },
+  Perera: { name: 'Perera Auto Works', addr: 'No. 8, Havelock Town, Colombo 05', dist: '2.3 km', eta: '~22 min', rating: '4.0 ★', coords: [6.8880, 79.8695], services: ['Tyre service','Brake repair','Oil change'] }
+};
+
+const svcIcons = { 
+  'Tyre change':'ti-circle-dotted','Battery replace':'ti-battery-charging','Engine check':'ti-engine-board','Towing':'ti-truck',
+  'Engine repair':'ti-engine','Electrical':'ti-bolt','AC repair':'ti-snowflake','Tyre service':'ti-circle-dotted','Brake repair':'ti-square-toggle','Oil change':'ti-droplet' 
+};
+
+let map;
+let userMarker;
+let defaultLat = 6.8930; // Simulated User coordinates around Colombo area
+let defaultLon = 79.8590;
+
+// Initialize Live Mapping Engine on Layout Launch
+window.addEventListener('DOMContentLoaded', () => {
+  initMapEngine();
+});
+
+function initMapEngine() {
+  // Renders the live interactive map targeting the DOM node container
+  map = L.map('live-map', {
+    zoomControl: false,
+    attributionControl: false
+  }).setView([defaultLat, defaultLon], 14);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+  // Custom User Marker Point (Green Pulsing Dot Emulator)
+  const userIcon = L.divIcon({
+    className: 'custom-div-icon',
+    html: "<div style='width:16px; height:16px; background:#28a745; border:3px solid white; border-radius:50%; box-shadow:0 0 8px rgba(0,0,0,0.3);'></div>",
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+  });
+  
+  userMarker = L.marker([defaultLat, defaultLon], {icon: userIcon}).addTo(map)
+    .bindPopup('<b>Your Breakdown Vehicle Location</b>').openPopup();
+
+  // Populate Garage Pin Positions onto the live Leaflet Layer Map Object
+  Object.keys(garages).forEach(key => {
+    const g = garages[key];
+    const garageIcon = L.divIcon({
+      className: 'garage-div-icon',
+      html: `<div style='width:32px; height:32px; background:#1a1a2e; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 4px 10px rgba(0,0,0,0.2); cursor:pointer;'><i class='ti ti-tool' style='font-size:16px;'></i></div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+
+    L.marker(g.coords, {icon: garageIcon}).addTo(map)
+      .bindPopup(`<b>${g.name}</b><br>${g.dist} away<br><span style="color:var(--color-success); font-weight:600">Click card below for details</span>`);
+  });
+
+  // Try to grab real physical GPS coordinates if the presentation environment allows it securely
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(position => {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+      
+      map.setView([lat, lon], 14);
+      userMarker.setLatLng([lat, lon]);
+      
+      document.getElementById('current-location-txt').textContent = "Live GPS Active";
+      document.getElementById('sos-live-loc').textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)} (My Device GPS)`;
+    }, () => {
+      // Fallback text if user denies browser location permissions
+      document.getElementById('sos-live-loc').textContent = "Galle Road, Colombo 05 (Simulated)";
+    });
+  }
+}
+
+function focusOnMap(lat, lon) {
+  if(map) {
+    map.panTo([lat, lon]);
+    map.setZoom(15);
+  }
+}
+
+// Single-Page View Controller Screen Router Engine
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+  document.getElementById('screen-' + id).style.display = 'flex';
+  
+  // Recalculate size bounding container if mapping layout requires view adjustments
+  if (id === 'home' && map) {
+    setTimeout(() => { map.invalidateSize(); }, 200);
+  }
+}
+
+function showHome() { showScreen('home'); }
+function showSOS() { showScreen('sos'); }
+
+function showDetail(key) {
+  const g = garages[key];
+  document.getElementById('detail-name').textContent = g.name;
+  document.getElementById('detail-addr').textContent = g.addr;
+  document.getElementById('d-dist').textContent = g.dist;
+  document.getElementById('d-eta').textContent = g.eta;
+  document.getElementById('d-rating').textContent = g.rating;
+  
+  const svcEl = document.getElementById('d-services');
+  svcEl.innerHTML = g.services.map(s => `
+    <div class="service-tag">
+      <i class="ti ${svcIcons[s] || 'ti-tool'}"></i>
+      ${s}
+    </div>
+  `).join('');
+  
+  showScreen('detail');
+}
+</script>
+</body>
+</html>
