@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RoadRescue SL - Desktop Control Panel</title>
+  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    :root {
+      --color-bg-primary: #ffffff;
+      --color-bg-secondary: #f8f9fa;
+      --color-text-primary: #1a1a2e;
+      --color-text-secondary: #6c757d;
+      --color-border: #e9ecef;
+      --color-danger: #e24b4a;
+      --color-success: #28a745;
+      --sidebar-width: 420px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--color-bg-secondary); color: var(--color-text-primary); height: 100vh; overflow: hidden; }
+    
+    /* Full Desktop Dashboard Layout Split Screen */
+    .dashboard-wrap { display: flex; width: 100%; height: 100vh; }
+    
+    /* Left Navigation Sidebar Panel */
+    .sidebar { width: var(--sidebar-width); height: 100%; background: var(--color-bg-primary); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; z-index: 1000; box-shadow: 4px 0 20px rgba(0,0,0,0.05); }
+    
+    /* Top Web Header Navbar */
+    .web-header { padding: 20px; background: #1a1a2e; color: #fff; display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand i { font-size: 24px; color: var(--color-success); }
+    .brand h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+    
+    .desktop-sos-btn { background: var(--color-danger); color: #fff; border: none; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.2s; }
+    .desktop-sos-btn:hover { background: #c93b3a; }
+
+    /* Content Scrolling Panel Viewports */
+    .view-container { flex: 1; overflow-y: auto; background: var(--color-bg-secondary); position: relative; }
+    .screen { display: none; flex-direction: column; padding: 16px; height: 100%; }
+    .screen.active { display: flex; }
+    
+    .content-scroll { overflow-y: auto; flex: 1; padding-right: 2px; }
+    .section-header { padding: 8px 4px 16px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-secondary); position: sticky; top: 0; background: var(--color-bg-secondary); z-index: 10; }
+    
+    /* Garage Cards Desktop Styling Optimization */
+    .garage-card { background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; }
+    .garage-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.05); border-color: #b7bcce; }
+    .garage-card.featured { border-left: 4px solid var(--color-success); }
+    .garage-top { display: flex; gap: 14px; }
+    .garage-avatar { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .garage-info { flex: 1; }
+    .garage-name { font-size: 16px; font-weight: 700; color: var(--color-text-primary); }
+    .garage-type { font-size: 13px; color: var(--color-text-secondary); margin-top: 2px; }
+    
+    .garage-meta { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+    .badge { font-size: 11px; padding: 4px 8px; border-radius: 6px; font-weight: 600; }
+    .badge-open { background: #eaf3de; color: #3b6d11; }
+    .badge-dist { background: var(--color-bg-secondary); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+    .stars { color: #EF9F27; font-size: 13px; }
+    
+    .garage-actions { display: flex; gap: 8px; margin-top: 14px; border-top: 1px solid var(--color-border); padding-top: 12px; }
+    .btn-call, .btn-dir { flex: 1; border: none; border-radius: 6px; padding: 10px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-call { background: var(--color-success); color: #fff; }
+    .btn-dir { background: var(--color-bg-secondary); color: var(--color-text-primary); border: 1px solid var(--color-border); }
+    
+    /* Right Side Full Screen Map Layout Layout Node Fixes */
+    .map-wrapper { flex: 1; height: 100vh; position: relative; background: #e5e3df; }
+    #live-map { height: 100vh !important; width: 100% !important; display: block; }
+    
+    /* Map Location Badge Bar overlay */
+    .map-overlay-badge { position: absolute; top: 20px; left: 20px; background: rgba(26, 26, 46, 0.95); color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; z-index: 999; box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
+    
+    /* Detail Inner View Layout Profile styles */
+    .back-btn { background: none; border: none; color: var(--color-text-secondary); cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 4px; margin-bottom: 16px; }
+    .back-btn:hover { color: var(--color-text-primary); }
+    .detail-name { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+    .detail-sub { font-size: 13px; color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px; margin-bottom: 20px; }
+    .detail-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+    .stat-box { background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px; text-align: center; }
+    .stat-val { font-size: 16px; font-weight: 700; }
+    .stat-lbl { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+    .services-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 24px; }
+    .service-tag { background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 6px; padding: 10px; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+    .service-tag i { color: var(--color-success); }
+    .call-big { width: 100%; background: var(--color-success); color: #fff; border: none; border-radius: 8px; padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(40,167,69,0.15); }
+
+    /* SOS Interactive View Layout */
+    .sos-view { text-align: center; padding: 30px 16px; background: #fdf2f2; border: 2px dashed var(--color-danger); border-radius: 12px; }
+    .sos-pulse { width: 80px; height: 80px; background: rgba(226,75,74,0.15); color: var(--color-danger); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; animation: pulse-radar 1.6s infinite ease-in-out; }
+    .sos-pulse i { font-size: 36px; }
+    @keyframes pulse-radar { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(226,75,74,0.4); } 70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(226,75,74,0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(226,74,74,0); } }
+    .sos-title { font-size: 20px; font-weight: 700; color: var(--color-danger); margin-bottom: 6px; }
+    .sos-sub { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 20px; line-height: 1.4; }
+    .sos-info-card { background: #fff; border: 1px solid var(--color-border); padding: 14px; border-radius: 8px; text-align: left; margin-bottom: 20px; }
+    .sos-cancel { background: var(--color-bg-primary); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: 6px; padding: 10px 24px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<div class="dashboard-wrap">
+  
+  <div class="sidebar">
+    <div class="web-header">
+      <div class="brand">
+        <i class="ti ti-activity-heartbeat"></i>
+        <h1>RoadRescue SL</h1>
+      </div>
+      <button class="desktop-sos-btn" onclick="showSOS()"><i class="ti ti-alert-triangle"></i> EMERGENCY SOS</button>
+    </div>
+    
+    <div class="view-container">
+      
+      <div class="screen active" id="screen-home">
+        <div class="content-scroll" id="dynamic-garage-list">
+          </div>
+      </div>
+      
+      <div class="screen" id="screen-detail">
+        <button class="back-btn" onclick="showHome()"><i class="ti ti-arrow-left"></i> View All Garages</button>
+        <div class="detail-name" id="detail-name">-</div>
+        <div class="detail-sub"><i class="ti ti-map-pin" style="color: var(--color-danger)"></i> <span id="detail-addr">-</span></div>
+        
+        <div class="detail-stats">
+          <div class="stat-box"><div class="stat-val" id="d-dist">-</div><div class="stat-lbl">Distance</div></div>
+          <div class="stat-box"><div class="stat-val" id="d-eta">-</div><div class="stat-lbl">Est. ETA</div></div>
+          <div class="stat-box"><div class="stat-val" id="d-rating">-</div><div class="stat-lbl">User Feedback</div></div>
+        </div>
+        
+        <div style="font-size:13px; font-weight:700; color:var(--color-text-secondary); text-transform:uppercase;">Station Framework Services</div>
+        <div class="services-grid" id="d-services"></div>
+        
+        <button class="call-big"><i class="ti ti-phone-call"></i> Connect with Vendor Terminal</button>
+      </div>
+
+      <div class="screen" id="screen-sos">
+        <div class="sos-view">
+          <div class="sos-pulse"><i class="ti ti-alert-triangle"></i></div>
+          <div class="sos-title">SOS Relay Triggered</div>
+          <div class="sos-sub">Telemetry positioning packets broadcasted to response units inside a 5km scanning radius.</div>
+          
+          <div class="sos-info-card">
+            <div style="font-size:11px; text-transform:uppercase; color:var(--color-text-secondary); margin-bottom:4px; font-weight:700;">Broadcast GPS Feeds</div>
+            <div style="font-size:14px; font-weight:700; font-family:monospace;" id="sos-live-loc">Searching Satellites...</div>
+          </div>
+          
+          <button class="sos-cancel" onclick="showHome()">Cancel Emergency Beacon</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  
+  <div class="map-wrapper">
+    <div class="map-overlay-badge">
+      <i class="ti ti-radar" style="color: var(--color-success); font-size:16px;"></i>
+      <span id="current-location-txt">Awaiting Live Location Verification...</span>
+    </div>
+    <div id="live-map"></div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// Localized 24/7 Sri Lankan Emergency Garage Array Database (30 entries)
+const garageList = [
+  { id: 'g1', name: 'Stafford Motor 24/7 Recovery', addr: 'Kandy Road, Mahara, Kadawatha', dist: '1.2 km', eta: '~5 min', rating: '4.9 ★', coords: [7.0016, 79.9525], phone: '0771911910', services: ['24/7 Mechanical Rescue', 'Battery Jumpstart', 'Emergency Towing'], type: 'Mechanical Rescue' },
+  { id: 'g2', name: 'George Motors Hub', addr: 'New Hunupitiya Road, Kiribathgoda', dist: '4.8 km', eta: '~12 min', rating: '4.5 ★', coords: [6.9740, 79.9322], phone: '0716820007', services: ['Engine Diagnostics', 'Electrical Repairs', '24h Light Towing'], type: 'Engine Diagnostics' },
+  { id: 'g3', name: 'VingTow / NS Recovery Hub', addr: 'Kaduwela Road, Malabe', dist: '11.5 km', eta: '~18 min', rating: '4.6 ★', coords: [6.9042, 79.9551], phone: '0704417093', services: ['Heavy Vehicle Recovery', 'Accident Wreck Transport', '24 Hours Tow Service'], type: 'Heavy Towing' },
+  { id: 'g4', name: 'Senevirathne Breakdown Service', addr: 'No. 78, Katuwawala, Boralesgamuwa', dist: '15.4 km', eta: '~28 min', rating: '4.7 ★', coords: [6.8344, 79.9074], phone: '0777775475', services: ['Accident Recovery', 'Flat Tyre Swap', 'Car Carrier'], type: 'Accident Recovery' },
+  { id: 'g5', name: 'OK Breakdown Service', addr: 'Malabe Road, Pannipitiya', dist: '14.1 km', eta: '~25 min', rating: '4.8 ★', coords: [6.8450, 79.9620], phone: '0772250124', services: ['Vehicle Towing', 'Roadside Assistance', 'Carriage Utilities'], type: 'Vehicle Towing' },
+  { id: 'g6', name: 'Ceylon Motor Works Services', addr: 'Kandy Road, Kelaniya', dist: '7.2 km', eta: '~15 min', rating: '4.5 ★', coords: [6.9532, 79.9144], phone: '0112917207', services: ['General Repairs', 'Engine Overhaul', 'Battery Jumpstart'], type: 'General Repairs' },
+  { id: 'g7', name: 'Malkey Emergency Fleet Unit', addr: 'No. 32, Elias Place, Colombo 04', dist: '16.2 km', eta: '~30 min', rating: '4.9 ★', coords: [6.8855, 79.8580], phone: '0112365365', services: ['24/7 Roadside Assistance', 'Replacement Vehicles', 'On-the-spot Insurance'], type: 'Fleet Assistance' },
+  { id: 'g8', name: 'Quick Fix Automobiles Ltd', addr: 'Ambathale Junction, Kohilawatta', dist: '9.8 km', eta: '~19 min', rating: '4.4 ★', coords: [6.9385, 79.9310], phone: '0779406799', services: ['Brake Repair', 'Suspension Tuning', 'Flat Tyre Swap'], type: 'Brake Specialist' },
+  { id: 'g9', name: 'Kalindu Auto Engineering', addr: 'Gampaha Road, Yakkala', dist: '18.1 km', eta: '~35 min', rating: '4.6 ★', coords: [7.0912, 80.0210], phone: '0332230885', services: ['Mechanical Engineering', 'A/C Repairs', 'Heavy Wrecker Towing'], type: 'Auto Engineering' },
+  { id: 'g10', name: 'R.M. Motor Works & Towing', addr: 'Henarathgoda, Mudungoda', dist: '14.2 km', eta: '~26 min', rating: '4.3 ★', coords: [7.0540, 80.0045], phone: '0332222867', services: ['Flatbed Towing', 'Wheel Alignment', 'Alternator Swaps'], type: 'Flatbed Towing' },
+  { id: 'g11', name: 'Creative Auto Shine Station', addr: 'Wasana Mawatha, Kalagedihena', dist: '22.4 km', eta: '~40 min', rating: '4.7 ★', coords: [7.1210, 80.0430], phone: '0332289873', services: ['Body Tinkering', 'Paint Touchup', 'Accident Recovery Support'], type: 'Accident Recovery' },
+  { id: 'g12', name: 'Hi-Tech Motors & Service', addr: 'No. 302, Kaduwela Road, Malabe', dist: '11.8 km', eta: '~20 min', rating: '4.8 ★', coords: [6.9060, 79.9575], phone: '0112413143', services: ['EFI Tuning', 'Hybrid Battery Diagnostics', 'Electrical Restoration'], type: 'Hybrid Specialist' },
+  { id: 'g13', name: 'Gamini Motors & Auto Engineers', addr: 'South Thalangama, Battaramulla', dist: '13.0 km', eta: '~22 min', rating: '4.5 ★', coords: [6.8920, 79.9280], phone: '0773640070', services: ['Suspension Rebuilds', 'Lube Service', 'Engine Tuning'], type: 'Suspension Repairs' },
+  { id: 'g14', name: 'Diluka Auto Engineers', addr: 'Kahawita Mawatha, Attidiya, Dehiwala', dist: '19.5 km', eta: '~34 min', rating: '4.4 ★', coords: [6.8432, 79.8790], phone: '0773056246', services: ['Clutch Kit Replacement', 'Gearbox Overhaul', 'On-site Breakdown Support'], type: 'Gearbox Repairs' },
+  { id: 'g15', name: 'Anuja Motors & Diagnostics', addr: 'Quarry Road, Dehiwala', dist: '18.9 km', eta: '~32 min', rating: '4.6 ★', coords: [6.8510, 79.8710], phone: '0112731237', services: ['Computer Scanning', 'Engine Light Reset', 'Battery Delivery'], type: 'Diagnostics' },
+  { id: 'g16', name: 'Mercantile Auto Rescue Node', addr: 'Sunethra Devi Mawatha, Kohuwela', dist: '16.5 km', eta: '~29 min', rating: '4.5 ★', coords: [6.8720, 79.8910], phone: '0112852327', services: ['Under-carriage Inspections', 'Brake Pad Swaps', 'Flatbed Recovery'], type: 'Brake Specialist' },
+  { id: 'g17', name: 'Ajith Motors Support Unit', addr: 'Sinhapura, Hokandara South', dist: '14.0 km', eta: '~24 min', rating: '4.2 ★', coords: [6.8840, 79.9710], phone: '077890844', services: ['General Tuning', 'Radiator Flush', 'Mobile Breakdown Mechanic'], type: 'Mobile Mechanic' },
+  { id: 'g18', name: 'Kentaro Auto Engineering', addr: 'Colombo Road, Pepiliyana', dist: '15.8 km', eta: '~27 min', rating: '4.7 ★', coords: [6.8640, 79.8995], phone: '0112890676', services: ['Japanese Vehicle Inspection', 'CV Joint Swaps', 'Fuel Pump Repair'], type: 'Japanese Imports' },
+  { id: 'g19', name: 'M Electrical Repair Terminal', addr: 'Andihena, Kotikawatta, Angoda', dist: '9.2 km', eta: '~17 min', rating: '4.6 ★', coords: [6.9320, 79.9190], phone: '0710439523', services: ['Wiring Harness Repair', 'Starter Motor Fix', 'Alternator Rebuilds'], type: 'Auto Electrical' },
+  { id: 'g20', name: 'Sagara Motor Garage Terminal', addr: 'Old Road, Navinna, Maharagama', dist: '15.1 km', eta: '~26 min', rating: '4.5 ★', coords: [6.8522, 79.9230], phone: '0716255068', services: ['Diesel Injection Tuning', 'Oil Filter Swaps', 'Towing Coordination'], type: 'Diesel Specialist' },
+  { id: 'g21', name: 'Nimali Garage Rescue Network', addr: 'Kandy Road, Nittambuwa', dist: '27.4 km', eta: '~45 min', rating: '4.4 ★', coords: [7.1430, 80.0980], phone: '0332285290', services: ['Heavy Truck Repair', 'Axle Straightening', 'Emergency Roadside Assist'], type: 'Heavy Vehicles' },
+  { id: 'g22', name: 'Sterling Express Lube Station', addr: 'Negombo Road, Wattala', dist: '8.4 km', eta: '~15 min', rating: '4.8 ★', coords: [6.9850, 79.8930], phone: '0117600800', services: ['Express Brake Servicing', 'Battery Replacement', 'Coolant Top-up'], type: 'Express Service' },
+  { id: 'g23', name: 'Dimuthu Mobile Mechanic Service', addr: 'Baseline Road, Borella, Colombo 08', dist: '12.4 km', eta: '~20 min', rating: '4.9 ★', coords: [6.9290, 79.8780], phone: '0771122334', services: ['Emergency Mobile Dispatch', 'Fuel Delivery', 'Lockout Assistance'], type: 'Mobile Mechanic' },
+  { id: 'g24', name: 'United Auto Electrical Hub', addr: 'Ragama Road, Kadawatha', dist: '1.9 km', eta: '~6 min', rating: '4.5 ★', coords: [7.0080, 79.9450], phone: '0722234567', services: ['Battery Testing', 'Fuse Box Repairs', 'Headlight Restoration'], type: 'Auto Electrical' },
+  { id: 'g25', name: 'Raja Garage and Towing', addr: 'Ganemulla Road, Kadawatha', dist: '2.5 km', eta: '~8 min', rating: '4.3 ★', coords: [7.0140, 79.9610], phone: '0711122334', services: ['Tyre Vulcanizing', 'Towing Assistance', 'Minor Mechanical Adjustments'], type: 'General Repairs' },
+  { id: 'g26', name: 'Jayalath Smart Auto Clinic', addr: 'Makola Road, Kiribathgoda', dist: '4.2 km', eta: '~11 min', rating: '4.7 ★', coords: [6.9680, 79.9410], phone: '0773344556', services: ['OBD Scanning', 'Throttle Body Cleaning', 'Spark Plug Swap'], type: 'Diagnostics' },
+  { id: 'g27', name: 'Erantha Hybrid Care', addr: 'Cotta Road, Rajagiriya', dist: '11.1 km', eta: '~19 min', rating: '4.8 ★', coords: [6.9110, 79.8920], phone: '0761122334', services: ['Inverter Cooling Flush', 'Hybrid Battery Cell Swaps', 'Brake Actuator Diagnostics'], type: 'Hybrid Specialist' },
+  { id: 'g28', name: 'Dasa Automotive Systems', addr: 'Low Level Road, Kaduwela', dist: '10.5 km', eta: '~18 min', rating: '4.4 ★', coords: [6.9290, 79.9840], phone: '0112233445', services: ['Suspension Bush Replacement', 'Shock Absorber Testing', 'Flat Towing'], type: 'Suspension Repairs' },
+  { id: 'g29', name: 'Metro Car Carrier Operations', addr: 'Galle Road, Colombo 03', dist: '15.6 km', eta: '~28 min', rating: '4.7 ★', coords: [6.9180, 79.8490], phone: '0751122334', services: ['Inter-District Car Moving', 'Low-Profile Car Towing', 'Accident Extraction'], type: 'Heavy Towing' },
+  { id: 'g30', name: 'Kelani Rescue Engineering', addr: 'Biyagama Road, Kelaniya', dist: '6.5 km', eta: '~14 min', rating: '4.5 ★', coords: [6.9590, 79.9320], phone: '0115566778', services: ['Radiator Repair', 'Belt Replacements', 'On-site Battery Charging'], type: 'General Repairs' }
+];
+
+const svcIcons = { 
+  '24/7 Mechanical Rescue':'ti-engine-board','Battery Jumpstart':'ti-battery-charging','Emergency Towing':'ti-truck',
+  'Accident Recovery':'ti-alert-triangle','Flat Tyre Swap':'ti-circle-dotted','Heavy Duty Car Carrier':'ti-truck',
+  'Engine Diagnostics':'ti-engine','Electrical Repairs':'ti-bolt','24h Light Towing':'ti-truck','Heavy Vehicle Recovery':'ti-truck',
+  'Accident Wreck Transport':'ti-alert-triangle','24 Hours Tow Service':'ti-truck','Vehicle Towing':'ti-truck','Roadside Assistance':'ti-help',
+  'Carriage Utilities':'ti-tool','General Repairs':'ti-tool','Engine Overhaul':'ti-engine-board','24/7 Roadside Assistance':'ti-shield',
+  'Replacement Vehicles':'ti-car','On-the-spot Insurance':'ti-file-text','Brake Repair':'ti-circle','Suspension Tuning':'ti-activity',
+  'Mechanical Engineering':'ti-settings','A/C Repairs':'ti-snowflake','Heavy Wrecker Towing':'ti-truck','Flatbed Towing':'ti-truck',
+  'Wheel Alignment':'ti-adjustments','Alternator Swaps':'ti-bolt','Body Tinkering':'ti-hammer','Paint Touchup':'ti-brush',
+  'Accident Recovery Support':'ti-alert-triangle','EFI Tuning':'ti-cpu','Hybrid Battery Diagnostics':'ti-battery','Electrical Restoration':'ti-bolt',
+  'Suspension Rebuilds':'ti-activity','Lube Service':'ti-droplet','Engine Tuning':'ti-cpu','Clutch Kit Replacement':'ti-settings',
+  'Gearbox Overhaul':'ti-settings','On-site Breakdown Support':'ti-map-pin','Computer Scanning':'ti-cpu','Engine Light Reset':'ti-alert-circle',
+  'Battery Delivery':'ti-battery-charging','Under-carriage Inspections':'ti-search','Brake Pad Swaps':'ti-circle','Mobile Breakdown Mechanic':'ti-user',
+  'Japanese Vehicle Inspection':'ti-search','CV Joint Swaps':'ti-settings','Fuel Pump Repair':'ti-gas-station','Wiring Harness Repair':'ti-bolt',
+  'Starter Motor Fix':'ti-bolt','Alternator Rebuilds':'ti-bolt','Diesel Injection Tuning':'ti-cpu','Oil Filter Swaps':'ti-droplet',
+  'Towing Coordination':'ti-truck','Heavy Truck Repair':'ti-truck','Axle Straightening':'ti-settings','Express Brake Servicing':'ti-circle',
+  'Battery Replacement':'ti-battery-charging','Coolant Top-up':'ti-droplet','Emergency Mobile Dispatch':'ti-send','Fuel Delivery':'ti-gas-station',
+  'Lockout Assistance':'ti-key','Battery Testing':'ti-battery','Fuse Box Repairs':'ti-bolt','Headlight Restoration':'ti-bulb',
+  'Tyre Vulcanizing':'ti-circle-dotted','Towing Assistance':'ti-truck','Minor Mechanical Adjustments':'ti-tool','OBD Scanning':'ti-cpu',
+  'Throttle Body Cleaning':'ti-tool','Spark Plug Swap':'ti-bolt','Inverter Cooling Flush':'ti-droplet','Hybrid Battery Cell Swaps':'ti-battery',
+  'Brake Actuator Diagnostics':'ti-cpu','Suspension Bush Replacement':'ti-settings','Shock Absorber Testing':'ti-activity','Flat Towing':'ti-truck',
+  'Inter-District Car Moving':'ti-truck','Low-Profile Car Towing':'ti-truck','Accident Extraction':'ti-alert-triangle','Radiator Repair':'ti-tool',
+  'Belt Replacements':'ti-tool','On-site Battery Charging':'ti-battery-charging'
+};
+
+let map;
+let userMarker;
+let defaultLat = 6.9920; 
+let defaultLon = 79.9480;
+
+window.addEventListener('DOMContentLoaded', () => {
+  initMapEngine();
+  renderDynamicGarageCards();
+});
+
+// Dynamic Card Rendering Engine
+function renderDynamicGarageCards() {
+  const container = document.getElementById('dynamic-garage-list');
+  container.innerHTML = '<div class="section-header">Nearest Emergency Garages (Colombo District)</div>';
+  
+  garageList.forEach((g, index) => {
+    const isFirst = index === 0 ? 'featured' : '';
+    const cardHtml = `
+      <div class="garage-card ${isFirst}" onclick="showDetail('${g.id}')">
+        <div class="garage-top">
+          <div class="garage-avatar" style="background:#eaf3de">🔧</div>
+          <div class="garage-info">
+            <div class="garage-name">${g.name}</div>
+            <div class="garage-type">${g.type} · ${g.services[0]}</div>
+            <div class="garage-meta">
+              <span class="badge badge-open">Open now</span>
+              <span class="badge badge-dist"><i class="ti ti-map-pin"></i> ${g.dist}</span>
+              <span class="stars">${g.rating}</span>
+            </div>
+          </div>
+        </div>
+        <div class="garage-actions">
+          <button class="btn-call" onclick="event.stopPropagation(); window.location.href='tel:${g.phone}'"><i class="ti ti-phone"></i> Call</button>
+          <button class="btn-dir" onclick="event.stopPropagation(); focusOnMap(${g.coords[0]}, ${g.coords[1]})"><i class="ti ti-navigation"></i> Track</button>
+        </div>
+      </div>
+    `;
+    container.insertAdjacentHTML('beforeend', cardHtml);
+  });
+}
+
+// Map Engine & Real GPS Live Location Stream Handler
+function initMapEngine() {
+  // Leaflet initialization setup
+  map = L.map('live-map', { zoomControl: true, attributionControl: false }).setView([defaultLat, defaultLon], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+  const userIcon = L.divIcon({
+    className: 'custom-div-icon',
+    html: "<div style='width:16px; height:16px; background:#28a745; border:3px solid white; border-radius:50%; box-shadow:0 0 8px rgba(0,0,0,0.3);'></div>",
+    iconSize: [16, 16],
+    iconAnchor: [8, 8]
+  });
+  
+  userMarker = L.marker([defaultLat, defaultLon], {icon: userIcon}).addTo(map).bindPopup('<b>Default Base Location (Kadawatha Corridor)</b>').openPopup();
+
+  // Mapping vector loops dropping all 30 points
+  garageList.forEach(g => {
+    const garageIcon = L.divIcon({
+      className: 'garage-div-icon',
+      html: `<div style='width:32px; height:32px; background:#1a1a2e; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 4px 10px rgba(0,0,0,0.2); cursor:pointer;'><i class='ti ti-tool' style='font-size:16px;'></i></div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+
+    L.marker(g.coords, {icon: garageIcon}).addTo(map).bindPopup(`<b>${g.name}</b><br>${g.dist} away`);
+  });
+
+  // Secure Geo-location high accuracy permission tracker
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(position => {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+      map.setView([lat, lon], 13);
+      userMarker.setLatLng([lat, lon]);
+      userMarker.setPopupContent('<b>Live GPS Location Verified</b>').openPopup();
+      document.getElementById('current-location-txt').textContent = "Live System Monitoring (GPS Verified)";
+      document.getElementById('sos-live-loc').textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    }, error => {
+      console.warn("GPS access blocked/unavailable. Defaulting to system anchor node framework coordinates.");
+      document.getElementById('current-location-txt').textContent = "System Core Node: Active Network Feed";
+    }, { enableHighAccuracy: true, timeout: 10000 });
+  }
+}
+
+function focusOnMap(lat, lon) {
+  if(map) {
+    map.panTo([lat, lon]);
+    map.setZoom(15);
+  }
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+  document.getElementById('screen-' + id).style.display = 'flex';
+}
+
+function showHome() { showScreen('home'); }
+function showSOS() { showScreen('sos'); }
+
+function showDetail(id) {
+  const g = garageList.find(item => item.id === id);
+  if(!g) return;
+
+  document.getElementById('detail-name').textContent = g.name;
+  document.getElementById('detail-addr').textContent = g.addr;
+  document.getElementById('d-dist').textContent = g.dist;
+  document.getElementById('d-eta').textContent = g.eta;
+  document.getElementById('d-rating').textContent = g.rating;
+  
+  const svcEl = document.getElementById('d-services');
+  svcEl.innerHTML = g.services.map(s => `
+    <div class="service-tag"><i class="ti ${svcIcons[s] || 'ti-tool'}"></i> ${s}</div>
+  `).join('');
+  
+  const callBtn = document.querySelector('.call-big');
+  callBtn.setAttribute('onclick', `window.location.href='tel:${g.phone}'`);
+  
+  showScreen('detail');
+  focusOnMap(g.coords[0], g.coords[1]);
+}
+</script>
+</body>
+</html>
